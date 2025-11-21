@@ -1,0 +1,28 @@
+{
+  "name": "xmtp-hpke-crasher",
+  "version": "1.0.0",
+  "description": "Minimal reproduction repository for XMTP Agent SDK HPKE decryption error (AgentError 1002)",
+  "main": "dist/repro.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && node dist/repro.js",
+    "clean": "rm -rf dist *.db3 *.db3-shm *.db3-wal"
+  },
+  "keywords": [
+    "xmtp",
+    "hpke",
+    "reproduction",
+    "bug"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@xmtp/agent-sdk": "^0.0.7",
+    "ethers": "^6.13.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}
