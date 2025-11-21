@@ -37,13 +37,27 @@ The script simulates the real-world scenario where a wallet has created multiple
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### Easiest Way: Use the run.sh Script
+
+```bash
+./run.sh
+```
+
+This single command will:
+- ✓ Check for Node.js and npm
+- ✓ Install dependencies if needed
+- ✓ Build the TypeScript
+- ✓ Run the reproduction script
+
+### Alternative: Manual Steps
+
+#### 1. Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Configure Environment (Optional)
+#### 2. Configure Environment (Optional)
 
 The default configuration uses the XMTP dev (testnet) environment. To customize:
 
@@ -56,7 +70,7 @@ Available options:
 - `XMTP_ENV`: `dev` (default, recommended) or `production`
 - `DEBUG`: `true` (default) for verbose logging
 
-### 3. Run the Reproduction Script
+#### 3. Run the Reproduction Script
 
 ```bash
 npm start
@@ -67,7 +81,7 @@ This will:
 - Compile TypeScript to JavaScript
 - Execute the reproduction script
 
-### Alternative: Run Individual Steps
+#### Other Commands
 
 ```bash
 # Build only
