@@ -255,7 +255,7 @@ When reporting results from this reproduction:
 
 ## 📝 License
 
-ISC
+Apache 2.0
 
 ## 🤝 Contributing
 
