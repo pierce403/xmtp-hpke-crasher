@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Minimal reproduction repository for XMTP Agent SDK HPKE decryption error (AgentError 1002)",
   "main": "dist/repro.js",
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "npm run build && node dist/repro.js",

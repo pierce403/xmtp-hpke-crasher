@@ -5,46 +5,129 @@
 
 set -e  # Exit on error
 
-echo "╔═══════════════════════════════════════════════════════╗"
-echo "║  XMTP HPKE Error Reproduction - Setup & Run          ║"
-echo "╚═══════════════════════════════════════════════════════╝"
-echo ""
+# Create logs directory if it doesn't exist
+mkdir -p logs
+
+# Generate log filename with timestamp
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+LOGFILE="logs/run_${TIMESTAMP}.log"
+
+# Function to log to both console and file
+log() {
+    echo "$@" | tee -a "$LOGFILE"
+}
+
+# Start logging
+log "╔═══════════════════════════════════════════════════════╗"
+log "║  XMTP HPKE Error Reproduction - Setup & Run          ║"
+log "╚═══════════════════════════════════════════════════════╝"
+log ""
+log "🕐 Started at: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+log "📁 Log file: $LOGFILE"
+log ""
+
+# System Information
+log "═══════════════════════════════════════════════════════"
+log "SYSTEM INFORMATION"
+log "═══════════════════════════════════════════════════════"
+log "Operating System: $(uname -s)"
+log "Kernel Version: $(uname -r)"
+log "Architecture: $(uname -m)"
+log "Hostname: $(hostname)"
+if [ -f /etc/os-release ]; then
+    log "Distribution: $(grep PRETTY_NAME /etc/os-release | cut -d'"' -f2)"
+fi
+log ""
 
 # Check if Node.js is installed
 if ! command -v node &> /dev/null; then
-    echo "❌ Error: Node.js is not installed"
-    echo "Please install Node.js 18+ from https://nodejs.org/"
+    log "❌ Error: Node.js is not installed"
+    log "Please install Node.js 18+ from https://nodejs.org/"
     exit 1
 fi
 
-echo "✓ Node.js version: $(node --version)"
-echo ""
+NODE_VERSION=$(node --version)
+log "✓ Node.js version: $NODE_VERSION"
 
 # Check if npm is installed
 if ! command -v npm &> /dev/null; then
-    echo "❌ Error: npm is not installed"
+    log "❌ Error: npm is not installed"
     exit 1
 fi
 
-echo "✓ npm version: $(npm --version)"
-echo ""
+NPM_VERSION=$(npm --version)
+log "✓ npm version: $NPM_VERSION"
+log ""
+
+# Package Information
+log "═══════════════════════════════════════════════════════"
+log "PACKAGE INFORMATION"
+log "═══════════════════════════════════════════════════════"
+if [ -f package.json ]; then
+    PROJECT_NAME=$(node -p "require('./package.json').name" 2>/dev/null || echo "unknown")
+    PROJECT_VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "unknown")
+    log "Project: $PROJECT_NAME"
+    log "Version: $PROJECT_VERSION"
+fi
+log ""
 
 # Install dependencies if node_modules doesn't exist
 if [ ! -d "node_modules" ]; then
-    echo "📦 Installing dependencies..."
-    npm install
-    echo ""
+    log "📦 Installing dependencies..."
+    npm install 2>&1 | tee -a "$LOGFILE"
+    log ""
 else
-    echo "✓ Dependencies already installed"
-    echo ""
+    log "✓ Dependencies already installed"
+    log ""
 fi
 
+# Show installed package versions
+log "═══════════════════════════════════════════════════════"
+log "INSTALLED DEPENDENCIES"
+log "═══════════════════════════════════════════════════════"
+if [ -f package.json ]; then
+    log "Dependencies:"
+    node -p "Object.entries(require('./package.json').dependencies || {}).map(([k,v]) => '  ' + k + ': ' + v).join('\n')" 2>/dev/null | tee -a "$LOGFILE" || true
+    log ""
+    log "Dev Dependencies:"
+    node -p "Object.entries(require('./package.json').devDependencies || {}).map(([k,v]) => '  ' + k + ': ' + v).join('\n')" 2>/dev/null | tee -a "$LOGFILE" || true
+fi
+log ""
+
 # Build the TypeScript
-echo "🔨 Building TypeScript..."
-npm run build
-echo ""
+log "═══════════════════════════════════════════════════════"
+log "BUILD"
+log "═══════════════════════════════════════════════════════"
+log "🔨 Building TypeScript..."
+npm run build 2>&1 | tee -a "$LOGFILE"
+log ""
 
 # Run the reproduction script
-echo "🚀 Running reproduction script..."
-echo ""
-node dist/repro.js
+log "═══════════════════════════════════════════════════════"
+log "REPRODUCTION SCRIPT EXECUTION"
+log "═══════════════════════════════════════════════════════"
+log "🚀 Running reproduction script..."
+log ""
+
+# Run the script and capture output
+node dist/repro.js 2>&1 | tee -a "$LOGFILE"
+
+# Capture exit code
+EXIT_CODE=${PIPESTATUS[0]}
+
+log ""
+log "═══════════════════════════════════════════════════════"
+log "EXECUTION COMPLETE"
+log "═══════════════════════════════════════════════════════"
+log "🕐 Finished at: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+log "📊 Exit code: $EXIT_CODE"
+log "📁 Full log saved to: $LOGFILE"
+log ""
+
+if [ $EXIT_CODE -eq 0 ]; then
+    log "✅ Script completed successfully"
+else
+    log "❌ Script failed with exit code $EXIT_CODE"
+fi
+
+exit $EXIT_CODE

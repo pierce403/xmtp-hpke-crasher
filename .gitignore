@@ -18,7 +18,8 @@ dist/
 *.db3-wal
 
 # Logs
-*.log
+logs/*
+!logs/README.md
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
