@@ -50,6 +50,25 @@ function deleteAgentDatabase(dbPath: string): void {
 }
 
 /**
+ * Create an XMTP-compatible signer from an ethers Wallet
+ */
+function createSignerFromWallet(wallet: Wallet): any {
+    return {
+        type: 'EOA',
+        getIdentifier: () => ({
+            identifier: wallet.address.toLowerCase(),
+            identifierKind: 0,  // IdentifierKind.Ethereum = 0
+        }),
+        signMessage: async (message: string): Promise<Uint8Array> => {
+            const signature = await wallet.signMessage(message);
+            // Remove '0x' prefix and convert hex string to Uint8Array
+            const hexStr = signature.startsWith('0x') ? signature.slice(2) : signature;
+            return new Uint8Array(Buffer.from(hexStr, 'hex'));
+        },
+    };
+}
+
+/**
  * Initialize an agent and wait for it to be ready
  */
 async function initializeAgent(
@@ -61,7 +80,10 @@ async function initializeAgent(
     console.log(`   Wallet Address: ${wallet.address}`);
     console.log(`   DB Path: ${dbPath}`);
 
-    const agent = await Agent.create(wallet, {
+    // Create XMTP-compatible signer
+    const signer = createSignerFromWallet(wallet);
+
+    const agent = await Agent.create(signer, {
         env: XMTP_ENV,
         dbPath,
     });

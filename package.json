@@ -7,7 +7,7 @@
     "postinstall": "./scripts/patch-proto.sh",
     "build": "tsc",
     "start": "npm run build && node dist/repro.js",
-    "dev": "tsx src/repro.ts",
+    "dev": "ts-node src/repro.ts",
     "clean": "rm -rf dist *.db3 *.db3-shm *.db3-wal"
   },
   "keywords": [
