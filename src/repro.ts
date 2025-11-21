@@ -24,8 +24,7 @@ dotenv.config();
 const XMTP_ENV = (process.env.XMTP_ENV || 'dev') as 'dev' | 'production';
 const DEBUG = process.env.DEBUG === 'true';
 const NUM_STALE_INSTALLATIONS = 3;
-const NUM_MESSAGES = 8;
-const MESSAGE_DELAY_MS = 1000;
+
 
 /**
  * Utility function to wait for a specified duration
@@ -100,6 +99,7 @@ async function initializeAgent(
     });
 
     // Start the agent
+    console.log(`   ... calling agent.start() for ${label}`);
     await agent.start();
     console.log(`   ✅ ${label} started`);
 
@@ -168,95 +168,77 @@ async function reproduce(): Promise<void> {
     const receiverDbPath = path.join(process.cwd(), 'receiver.db3');
     const senderDbPath = path.join(process.cwd(), 'sender.db3');
 
+    // Clean up any existing DBs from previous runs
+    console.log('   🧹 Cleaning up old databases...');
+    deleteAgentDatabase(receiverDbPath);
+    deleteAgentDatabase(senderDbPath);
+
     try {
         // PHASE 1: Create stale installations
         await createStaleInstallations(receiverWallet, receiverDbPath);
 
-        // PHASE 2: Initialize final receiver (keep it running)
+        // PHASE 2: Initialize final receiver
         console.log('\n═══════════════════════════════════════════════════════');
-        console.log('PHASE 2: Initializing Final Receiver Instance');
+        console.log('PHASE 2: Final Receiver Initialization');
         console.log('═══════════════════════════════════════════════════════');
 
-        const receiver = await initializeAgent(
-            receiverWallet,
-            receiverDbPath,
-            'Receiver (FINAL)'
-        );
+        const receiverAgent = await initializeAgent(receiverWallet, receiverDbPath, 'Final Receiver');
 
-        console.log('\n📡 Receiver listening for messages...');
+        // Listen for messages on the receiver
+        console.log('   👂 Receiver listening for messages...');
 
-        // Set up message listener
-        receiver.on('message', (ctx: any) => {
-            console.log('\n📨 Message received:');
-            console.log('   From:', ctx.message.senderAddress);
-            console.log('   Content:', ctx.message.content);
+        // Create a promise that resolves when the poke message is received
+        const pokeReceived = new Promise<void>((resolve) => {
+            receiverAgent.on('message', async (message: any) => {
+                try {
+                    const text = message.content.text || message.content;
+                    console.log(`   📩 Receiver got message: "${text}"`);
+
+                    if (text === 'poke') {
+                        console.log('\n✅ SUCCESS: Received "poke" message! Test passed.');
+                        resolve();
+                    }
+                } catch (err) {
+                    console.error('   ❌ Error processing message:', err);
+                }
+            });
         });
 
-        // PHASE 3: Initialize sender
+        // PHASE 3: Initialize sender and send messages
         console.log('\n═══════════════════════════════════════════════════════');
-        console.log('PHASE 3: Initializing Sender');
+        console.log('PHASE 3: Sender Initialization & Messaging');
         console.log('═══════════════════════════════════════════════════════');
 
-        const sender = await initializeAgent(
-            senderWallet,
-            senderDbPath,
-            'Sender'
-        );
+        const senderAgent = await initializeAgent(senderWallet, senderDbPath, 'Sender');
 
-        // Wait a bit for both agents to be fully ready
-        console.log('\n⏳ Waiting for agents to sync...');
-        await delay(3000);
+        // Create conversation
+        console.log(`   🤝 Creating conversation with ${receiverWallet.address}...`);
+        const conversation = await senderAgent.conversations.newConversation(receiverWallet.address);
 
-        // PHASE 4: Send messages
-        console.log('\n═══════════════════════════════════════════════════════');
-        console.log('PHASE 4: Sending Messages');
-        console.log('═══════════════════════════════════════════════════════');
+        console.log('   📤 Sending "poke" message...');
+        await conversation.send('poke');
+        console.log('   ✅ "poke" message sent');
 
-        console.log(`\n📤 Sending ${NUM_MESSAGES} messages from Sender to Receiver...`);
+        // Wait for the poke to be received or timeout
+        console.log('   ⏳ Waiting for receiver to get the message...');
 
-        // Create a conversation from sender to receiver
-        console.log('\n   Creating conversation...');
-        const conversation = await sender.client.conversations.newConversation(receiverWallet.address);
-        console.log(`   ✅ Conversation created: ${conversation.id}`);
-
-        for (let i = 1; i <= NUM_MESSAGES; i++) {
-            const message = `Test message ${i}/${NUM_MESSAGES} - Testing HPKE decryption with stale installations`;
-
-            try {
-                console.log(`\n   Sending message ${i}...`);
-                await conversation.send(message);
-                console.log(`   ✅ Message ${i} sent: "${message}"`);
-
-                // Wait between messages
-                if (i < NUM_MESSAGES) {
-                    await delay(MESSAGE_DELAY_MS);
-                }
-            } catch (error) {
-                console.error(`\n   ❌ Failed to send message ${i}:`, error);
-            }
-        }
-
-        // Keep listening for a bit to catch any errors
-        console.log('\n⏳ Waiting for messages to be processed...');
-        await delay(10000);
+        await Promise.race([
+            pokeReceived,
+            delay(30000).then(() => {
+                throw new Error('Timeout waiting for poke message');
+            })
+        ]);
 
         console.log('\n═══════════════════════════════════════════════════════');
-        console.log('PHASE 5: Cleanup');
+        console.log('EXECUTION COMPLETE');
         console.log('═══════════════════════════════════════════════════════');
 
-        // Clean up
+        // Cleanup
         console.log('\n🛑 Stopping agents...');
-        sender.stop();
-        console.log('   ✅ Sender stopped');
-        receiver.stop();
-        console.log('   ✅ Receiver stopped');
+        await senderAgent.stop();
+        await receiverAgent.stop();
 
-        console.log('\n✅ Reproduction script completed');
-        console.log('\n📊 Summary:');
-        console.log(`   - Created ${NUM_STALE_INSTALLATIONS} stale receiver installations`);
-        console.log(`   - Current receiver installation: ${receiver.client.installationId}`);
-        console.log(`   - Messages sent: ${NUM_MESSAGES}`);
-        console.log('\n💡 Check the logs above for any HPKE decryption errors (AgentError 1002)');
+        process.exit(0);
 
     } catch (error) {
         console.error('\n❌ FATAL ERROR:', error);

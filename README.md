@@ -2,9 +2,10 @@
 
 A minimal Node.js/TypeScript repository to reproduce the OpenMLS HPKE decryption error (`AgentError 1002`) in the XMTP Agent SDK.
 
-## 🐛 Issue Description
+## Expected Behavior
+- **Success**: The script runs through all phases, the sender sends a "poke" message, and the receiver successfully receives it. The script prints "✅ SUCCESS: Received "poke" message! Test passed." and exits with code 0.
+- **Failure**: The script crashes with an `AgentError` (specifically HPKE decryption error) or times out waiting for the message.
 
-This repository reproduces a critical bug where the XMTP Agent SDK crashes with an HPKE decryption error when:
 - An agent identity has multiple conflicting or stale installations on the network
 - Messages are received while the agent is streaming conversations
 
