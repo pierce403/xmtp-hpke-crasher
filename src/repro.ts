@@ -18,7 +18,6 @@ import { Wallet } from 'ethers';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 dotenv.config();
 
@@ -255,10 +254,7 @@ process.on('uncaughtException', (error) => {
 });
 
 // Run the reproduction
-// In ES modules, check if this file is being run directly
-const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
-
-if (isMainModule) {
+if (require.main === module) {
     reproduce()
         .then(() => {
             console.log('\n✅ Script finished successfully');
@@ -270,4 +266,4 @@ if (isMainModule) {
         });
 }
 
-export { reproduce };
+module.exports = { reproduce };

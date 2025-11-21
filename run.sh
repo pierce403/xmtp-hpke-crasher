@@ -94,23 +94,10 @@ if [ -f package.json ]; then
 fi
 log ""
 
-# Build the TypeScript
-log "═══════════════════════════════════════════════════════"
-log "BUILD"
-log "═══════════════════════════════════════════════════════"
-log "🔨 Building TypeScript..."
-npm run build 2>&1 | tee -a "$LOGFILE"
+# Run the reproduction script using ts-node (handles ESM/CommonJS issues)
+log "🚀 Running reproduction script with ts-node..."
 log ""
-
-# Run the reproduction script
-log "═══════════════════════════════════════════════════════"
-log "REPRODUCTION SCRIPT EXECUTION"
-log "═══════════════════════════════════════════════════════"
-log "🚀 Running reproduction script..."
-log ""
-
-# Run the script and capture output
-node dist/repro.js 2>&1 | tee -a "$LOGFILE"
+npx ts-node src/repro.ts 2>&1 | tee -a "$LOGFILE"
 
 # Capture exit code
 EXIT_CODE=${PIPESTATUS[0]}

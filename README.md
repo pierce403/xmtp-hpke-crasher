@@ -34,20 +34,15 @@ The script simulates the real-world scenario where a wallet has created multiple
 
 ### ESM Import Resolution Error
 
-Currently, the `@xmtp/agent-sdk@^0.0.7` package has a dependency (`@xmtp/proto`) with incomplete ES module support. The proto package's `index.js` imports files without `.js` extensions, which causes Node.js ESM resolution to fail:
+The `@xmtp/agent-sdk@^0.0.7` package has a dependency (`@xmtp/proto`) with incomplete ES module support. The proto package's `index.js` imports files without `.js` extensions, which causes Node.js ESM resolution to fail.
 
+**Workaround Implemented**: This repository includes a `postinstall` script (`scripts/patch-proto.sh`) that automatically patches the `@xmtp/proto` package after `npm install` by adding `.js` extensions to all relative imports. This allows the reproduction script to run successfully using `ts-node`.
+
+**Usage**: Simply run `npm install` and the patch will be applied automatically. To run the script, use:
+```bash
+npm run dev  # or
+npx ts-node src/repro.ts
 ```
-Error [ERR_MODULE_NOT_FOUND]: Cannot find module '.../message_api/v1/message_api.pb'
-```
-
-**Status**: This is a bug in the SDK dependencies, not in this reproduction repository.
-
-**Workarounds being investigated**:
-- Wait for SDK package to be updated with proper ESM exports
-- Try using an earlier version of the SDK
-- Use a module loader/transpiler workaround
-
-The repository structure, logging, and reproduction logic are complete and ready to use once this SDK issue is resolved.
 
 ## 📋 Requirements
 
