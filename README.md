@@ -2,34 +2,13 @@
 
 A minimal Node.js/TypeScript repository to reproduce the OpenMLS HPKE decryption error (`AgentError 1002`) in the XMTP Agent SDK.
 
+## 🐛 Issue Description
+This repository reproduces an issue where the XMTP Agent SDK may hang or fail during message exchange.
+
 ## Expected Behavior
 - **Success**: The script runs through all phases, the sender sends a "poke" message, and the receiver successfully receives it. The script prints "✅ SUCCESS: Received "poke" message! Test passed." and exits with code 0.
 - **Failure**: The script crashes with an `AgentError` (specifically HPKE decryption error) or times out waiting for the message.
 
-- An agent identity has multiple conflicting or stale installations on the network
-- Messages are received while the agent is streaming conversations
-
-**Error Signature:**
-```
-Decryption failed (AgentError 1002)
-OpenMLS HPKE error during conversation streaming
-```
-
-## 🎯 Reproduction Strategy
-
-The script simulates the real-world scenario where a wallet has created multiple installations over time (e.g., from different devices or reinstallations) by:
-
-1. **Creating Stale Installations**: Initialize the receiver agent 3 times, each time:
-   - Start the agent (creates new installation on network)
-   - Wait for network registration
-   - Stop the agent
-   - **Delete the local `.db3` database** (forces new Installation ID on next startup)
-
-2. **Final Receiver Setup**: Initialize receiver a 4th time and keep it running
-
-3. **Trigger Error**: Initialize sender and send multiple messages to the receiver
-
-4. **Expected Result**: The receiver should encounter HPKE decryption errors when trying to decrypt messages sent to the stale installation IDs
 
 ## ⚠️ Known Issues
 
@@ -109,96 +88,6 @@ node dist/repro.js
 npm run clean
 ```
 
-## 📊 What to Expect
-
-### Script Phases
-
-The reproduction script executes in 5 phases:
-
-#### **Phase 1: Creating Stale Installations**
-```
---- Stale Installation 1/3 ---
-🚀 Initializing Receiver (Stale #1)...
-   Wallet Address: 0x...
-   🔑 Installation ID: abc123...
-   ⏳ Waiting for network registration...
-   🛑 Stopping agent...
-   🗑️  Deleting database to create stale installation...
-```
-
-Repeats 3 times to create multiple stale installations on the XMTP network.
-
-#### **Phase 2: Initializing Final Receiver Instance**
-```
-🚀 Initializing Receiver (FINAL)...
-   Wallet Address: 0x...
-   🔑 Installation ID: def456...
-📡 Receiver listening for messages...
-```
-
-This is the "live" receiver that will attempt to decrypt incoming messages.
-
-#### **Phase 3: Initializing Sender**
-```
-🚀 Initializing Sender...
-   Wallet Address: 0x...
-   🔑 Installation ID: ghi789...
-```
-
-#### **Phase 4: Sending Messages**
-```
-📤 Sending 8 messages from Sender to Receiver...
-   Sending message 1...
-   ✅ Message 1 sent: "Test message 1/8 - Testing HPKE decryption..."
-```
-
-Messages are sent with 1-second delays between each.
-
-#### **Phase 5: Cleanup**
-```
-🛑 Stopping agents...
-   ✅ Sender stopped
-   ✅ Receiver stopped
-```
-
-### Success Criteria
-
-The reproduction is **successful** if one or more of the following occurs:
-
-✅ **HPKE Decryption Error** logged in receiver:
-```
-❌ ERROR in Receiver (FINAL): OpenMLS HPKE error
-Error code: 1002
-```
-
-✅ **Agent Crash** - The receiver agent crashes during message processing
-
-✅ **Unhandled Rejection** related to decryption failures
-
-## 🔍 Debugging
-
-### Enable Verbose Logging
-
-Set `DEBUG=true` in `.env` (enabled by default)
-
-### Check Database Files
-
-The script creates two database files:
-- `receiver.db3` - Receiver agent's local storage
-- `sender.db3` - Sender agent's local storage
-
-These are automatically cleaned by `npm run clean`.
-
-### Manual Cleanup
-
-```bash
-# Remove all database files
-rm -f *.db3 *.db3-shm *.db3-wal
-
-# Remove build output
-rm -rf dist
-```
-
 ## 🏗️ Project Structure
 
 ```
@@ -211,20 +100,65 @@ xmtp-hpke-crasher/
 ├── .gitignore           # Git ignore rules
 ├── package.json         # Project dependencies and scripts
 ├── tsconfig.json        # TypeScript configuration
-└── README.md           # This file
+├── README.md           # This file
 ```
+
+## 🎯 Reproduction Strategy
+
+The script simplifies the interaction to the bare minimum:
+1. **Receiver Setup**: Initialize a receiver agent.
+2. **Sender Setup**: Initialize a sender agent.
+3. **Messaging**: Send a "poke" message from sender to receiver.
+4. **Verification**: Wait for the receiver to process the message.
+
+## 📊 What to Expect
+
+### Script Phases
+
+The reproduction script executes in 2 phases:
+
+#### **Phase 1: Receiver Initialization**
+```
+🚀 Initializing Receiver...
+   Wallet Address: 0x...
+   🔑 Installation ID: def456...
+� Receiver listening for messages...
+```
+
+#### **Phase 2: Sender Initialization & Messaging**
+```
+🚀 Initializing Sender...
+   Wallet Address: 0x...
+   🔑 Installation ID: ghi789...
+🤝 Creating conversation with 0x...
+📤 Sending "poke" message...
+✅ "poke" message sent
+```
+
+### Success Criteria
+
+The reproduction is **successful** if:
+
+✅ **Message Received**:
+```
+📩 Receiver got message: "poke"
+✅ SUCCESS: Received "poke" message! Test passed.
+```
+
+### Failure Criteria
+
+The reproduction **fails** (reproduces the bug) if:
+
+❌ **Hang**: The script hangs indefinitely at `agent.start()` or while waiting for the message.
+❌ **Crash**: The script crashes with an `AgentError` or other exception.
 
 ## 🔧 Technical Details
 
 ### Why This Reproduces the Error
-
-1. **Multiple Installation IDs**: Each time we delete the database and reinitialize, the SDK creates a **new Installation ID** for the same wallet address
-
-2. **Stale Installations on Network**: The XMTP network retains all installation IDs associated with a wallet address
-
-3. **Message Routing**: When the sender sends a message, the network may attempt to deliver it to **all installations** (including stale ones)
-
-4. **HPKE Decryption Failure**: The current "live" receiver installation cannot decrypt messages encrypted for the **stale installation IDs** it no longer has keys for
+This minimal setup isolates the core agent-to-agent communication. If this fails or hangs, it indicates a fundamental issue with:
+1. **Network Connectivity**: Inability to connect to XMTP nodes.
+2. **Agent Initialization**: Issues with the `Agent.create` or `agent.start` process.
+3. **Message Delivery**: Problems with the message delivery pipeline.
 
 ### Key SDK Concepts
 

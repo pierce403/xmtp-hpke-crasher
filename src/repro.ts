@@ -23,7 +23,7 @@ dotenv.config();
 
 const XMTP_ENV = (process.env.XMTP_ENV || 'dev') as 'dev' | 'production';
 const DEBUG = process.env.DEBUG === 'true';
-const NUM_STALE_INSTALLATIONS = 3;
+
 
 
 /**
@@ -110,42 +110,7 @@ async function initializeAgent(
     return agent;
 }
 
-/**
- * Create stale installations by repeatedly initializing and deleting the database
- */
-async function createStaleInstallations(
-    wallet: any,
-    dbPath: string
-): Promise<void> {
-    console.log('\n═══════════════════════════════════════════════════════');
-    console.log('PHASE 1: Creating Stale Installations');
-    console.log('═══════════════════════════════════════════════════════');
 
-    for (let i = 1; i <= NUM_STALE_INSTALLATIONS; i++) {
-        console.log(`\n--- Stale Installation ${i}/${NUM_STALE_INSTALLATIONS} ---`);
-
-        // Initialize agent
-        const agent = await initializeAgent(wallet, dbPath, `Receiver (Stale #${i})`);
-
-        // Wait a bit for the agent to be fully registered on the network
-        console.log('   ⏳ Waiting for network registration...');
-        await delay(3000);
-
-        // Stop the agent
-        console.log('   🛑 Stopping agent...');
-        agent.stop();
-        console.log('   ✅ Agent stopped');
-
-        // Delete the database to force a new installation ID on next init
-        console.log('   🗑️  Deleting database to create stale installation...');
-        deleteAgentDatabase(dbPath);
-
-        // Brief pause between iterations
-        await delay(1000);
-    }
-
-    console.log('\n✅ Created ' + NUM_STALE_INSTALLATIONS + ' stale installations');
-}
 
 /**
  * Main reproduction function
@@ -174,15 +139,12 @@ async function reproduce(): Promise<void> {
     deleteAgentDatabase(senderDbPath);
 
     try {
-        // PHASE 1: Create stale installations
-        await createStaleInstallations(receiverWallet, receiverDbPath);
-
-        // PHASE 2: Initialize final receiver
+        // PHASE 1: Initialize Receiver
         console.log('\n═══════════════════════════════════════════════════════');
-        console.log('PHASE 2: Final Receiver Initialization');
+        console.log('PHASE 1: Receiver Initialization');
         console.log('═══════════════════════════════════════════════════════');
 
-        const receiverAgent = await initializeAgent(receiverWallet, receiverDbPath, 'Final Receiver');
+        const receiverAgent = await initializeAgent(receiverWallet, receiverDbPath, 'Receiver');
 
         // Listen for messages on the receiver
         console.log('   👂 Receiver listening for messages...');
@@ -204,9 +166,9 @@ async function reproduce(): Promise<void> {
             });
         });
 
-        // PHASE 3: Initialize sender and send messages
+        // PHASE 2: Initialize Sender and send message
         console.log('\n═══════════════════════════════════════════════════════');
-        console.log('PHASE 3: Sender Initialization & Messaging');
+        console.log('PHASE 2: Sender Initialization & Messaging');
         console.log('═══════════════════════════════════════════════════════');
 
         const senderAgent = await initializeAgent(senderWallet, senderDbPath, 'Sender');
