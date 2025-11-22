@@ -67,6 +67,123 @@ ensure_modern_rust() {
 }
 
 ensure_modern_rust
+apply_hpke_instrumentation_patch() {
+  local file="${LIBXMTP_DIR}/xmtp_mls/src/groups/mls_ext/welcome_wrapper.rs"
+  if [ ! -f "${file}" ]; then
+    echo "[add-instrumentation] welcome_wrapper.rs not found, skipping HPKE patch" >&2
+    return
+  fi
+
+  if grep -q "HPKE unwrap_welcome starting (instrumented v2)" "${file}"; then
+    echo "[add-instrumentation] HPKE instrumentation already applied" >&2
+    return
+  fi
+
+  echo "[add-instrumentation] Patching HPKE instrumentation into welcome_wrapper.rs..." >&2
+  python - "${file}" <<'PY'
+import sys
+path = sys.argv[1]
+text = open(path, "r").read()
+
+if "HPKE unwrap_welcome starting (instrumented v2)" in text:
+    sys.exit(0)
+
+if "use hex;" not in text:
+    text = text.replace(
+        "use thiserror::Error;\nuse tls_codec",
+        "use thiserror::Error;\nuse hex;\nuse tls_codec",
+        1,
+    )
+
+text = text.replace(
+"""    error!(
+        wrapped_welcome_len = wrapped_welcome.len(),
+        wrapped_welcome_metadata_len = wrapped_welcome_metadata.len(),
+        private_key_len = private_key.len(),
+        wrapper_algorithm = ?wrapper_algorithm,
+        "HPKE unwrap_welcome starting"
+    );""",
+"""    let wrapped_welcome_hex = hex::encode(wrapped_welcome);
+    let wrapped_welcome_metadata_hex = hex::encode(wrapped_welcome_metadata);
+    let private_key_prefix_hex = hex::encode(&private_key[..private_key.len().min(16)]);
+    error!(
+        wrapped_welcome_len = wrapped_welcome.len(),
+        wrapped_welcome_metadata_len = wrapped_welcome_metadata.len(),
+        private_key_len = private_key.len(),
+        wrapped_welcome_hex = %wrapped_welcome_hex,
+        wrapped_welcome_metadata_hex = %wrapped_welcome_metadata_hex,
+        private_key_prefix_hex = %private_key_prefix_hex,
+        wrapper_algorithm = ?wrapper_algorithm,
+        "HPKE unwrap_welcome starting (instrumented v2)"
+    );""",
+)
+
+text = text.replace(
+"""            error!(
+                ?e,
+                kem_output_len = ciphertext.kem_output.as_ref().len(),
+                ciphertext_len = ciphertext.ciphertext.as_ref().len(),
+                private_key_len = private_key.len(),
+                wrapper_algorithm = ?wrapper_algorithm,
+                "HPKE unwrap_welcome setup_receiver failed"
+            );""",
+"""            error!(
+                ?e,
+                kem_output_len = ciphertext.kem_output.as_ref().len(),
+                ciphertext_len = ciphertext.ciphertext.as_ref().len(),
+                private_key_len = private_key.len(),
+                kem_output_hex = %hex::encode(ciphertext.kem_output.as_ref()),
+                ciphertext_hex = %hex::encode(ciphertext.ciphertext.as_ref()),
+                wrapper_algorithm = ?wrapper_algorithm,
+                "HPKE unwrap_welcome setup_receiver failed"
+            );""",
+)
+
+text = text.replace(
+"""            error!(
+                ?e,
+                kem_output_len = ciphertext.kem_output.as_ref().len(),
+                ciphertext_len = ciphertext.ciphertext.as_ref().len(),
+                private_key_len = private_key.len(),
+                wrapper_algorithm = ?wrapper_algorithm,
+                "HPKE unwrap_welcome failed to open welcome"
+            );""",
+"""            error!(
+                ?e,
+                kem_output_len = ciphertext.kem_output.as_ref().len(),
+                ciphertext_len = ciphertext.ciphertext.as_ref().len(),
+                private_key_len = private_key.len(),
+                kem_output_hex = %hex::encode(ciphertext.kem_output.as_ref()),
+                ciphertext_hex = %hex::encode(ciphertext.ciphertext.as_ref()),
+                wrapper_algorithm = ?wrapper_algorithm,
+                "HPKE unwrap_welcome failed to open welcome"
+            );""",
+)
+
+text = text.replace(
+"""                error!(
+                    ?e,
+                    kem_output_len = ciphertext.kem_output.as_ref().len(),
+                    metadata_len = wrapped_welcome_metadata.len(),
+                    private_key_len = private_key.len(),
+                    wrapper_algorithm = ?wrapper_algorithm,
+                    "HPKE unwrap_welcome failed to open welcome_metadata"
+                );""",
+"""                error!(
+                    ?e,
+                    kem_output_len = ciphertext.kem_output.as_ref().len(),
+                    metadata_len = wrapped_welcome_metadata.len(),
+                    private_key_len = private_key.len(),
+                    kem_output_hex = %hex::encode(ciphertext.kem_output.as_ref()),
+                    metadata_hex = %hex::encode(wrapped_welcome_metadata),
+                    wrapper_algorithm = ?wrapper_algorithm,
+                    "HPKE unwrap_welcome failed to open welcome_metadata"
+                );""",
+)
+
+open(path, "w").write(text)
+PY
+}
 
 if ! command -v yarn >/dev/null 2>&1; then
   echo "[add-instrumentation] yarn not found; attempting to install globally via npm..." >&2
@@ -114,6 +231,8 @@ fi
 echo "[add-instrumentation] Building @xmtp/node-bindings from vendored libxmtp..."
 pushd "${ROOT_DIR}/libxmtp/bindings_node" >/dev/null
 yarn install
+# Apply HPKE instrumentation patch before building bindings
+apply_hpke_instrumentation_patch
 yarn build:clean
 yarn build:test
 yarn build:finish
