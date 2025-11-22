@@ -8,6 +8,10 @@ pnpm-lock.yaml
 dist/
 *.tsbuildinfo
 
+# Compiled JS in source (TypeScript only)
+src/*.js
+src/*.js.map
+
 # Environment files
 .env
 .env.local

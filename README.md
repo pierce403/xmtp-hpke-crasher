@@ -3,11 +3,36 @@
 A minimal Node.js/TypeScript repository to reproduce the OpenMLS HPKE decryption error (`AgentError 1002`) in the XMTP Agent SDK.
 
 ## 🐛 Issue Description
-This repository reproduces an issue where the XMTP Agent SDK may hang or fail during message exchange.
 
-## Expected Behavior
-- **Success**: The script runs through all phases, the sender sends a "poke" message, and the receiver successfully receives it. The script prints "✅ SUCCESS: Received "poke" message! Test passed." and exits with code 0.
-- **Failure**: The script crashes with an `AgentError` (specifically HPKE decryption error) or times out waiting for the message.
+This repository reproduces an **OpenMLS HPKE decryption error** that occurs when XMTP clients attempt to decrypt messages. The SDK **silently swallows** this error, making it nearly impossible to detect without debug logging enabled.
+
+## 🎯 Current Reproduction Strategy
+
+The most reliable way to reproduce this error:
+
+1. **Start receiver in listening mode**:
+   ```bash
+   ./run.sh --recv
+   ```
+   
+2. **Send a message from an external XMTP client** (e.g., mobile app) to the displayed address
+
+3. **Observe the error** in the debug logs:
+   ```
+   💓 [2025-11-22T11:49:47.894Z] Waiting for messages... (RSS: 305MB)
+   {"timestamp":"2025-11-22T11:49:49.055727Z","level":"ERROR","message":"failed to create group from welcome created at 1763812188937084000: OpenMLS HPKE error: Decryption failed.","target":"xmtp_mls::groups::welcome_sync"}
+   {"timestamp":"2025-11-22T11:49:49.055757Z","level":"WARN","message":"[received] message error, swallowing to continue stream","inbox_id":"e02851912f1f970056ff326cc791f3b1cf7265c77e65e9f77dc056d93f965275","error":"Group(UnwrapWelcome(Hpke(DecryptionFailed)))","target":"bindings_node::conversations"}
+   💓 [2025-11-22T11:49:52.900Z] Waiting for messages... (RSS: 305MB)
+   ```
+
+### Platform-Specific Behavior
+
+⚠️ **This error appears reliably on GB10 systems** but has not been observed on other platforms yet. The root cause of this platform-specific behavior is still under investigation.
+
+## Expected vs. Actual Behavior
+
+- **Expected**: The agent emits an `'error'` event when HPKE decryption fails, allowing the application to handle it
+- **Actual**: The error is caught in the Rust→Node.js bindings and logged as "swallowing to continue stream" - it never reaches the application layer
 
 
 ## ⚠️ Known Issues
@@ -86,7 +111,65 @@ node dist/repro.js
 
 # Clean build artifacts and databases
 npm run clean
+
+# Receiver-only mode (listen for messages)
+./run.sh --recv
+
+# Send to specific address
+./run.sh 0x1234...
 ```
+
+## 🔍 HPKE Error Findings
+
+### Issue Summary
+
+We successfully reproduced an **OpenMLS HPKE decryption error** that occurs when a client with a stale installation attempts to send messages. The SDK **silently swallows this error** by design, making it difficult to debug.
+
+### How to Reproduce
+
+1. **Start receiver in listening mode**:
+   ```bash
+   ./run.sh --recv
+   ```
+   This will output an address like: `Listening for messages on: 0x...`
+
+2. **Send a message from a client with stale keys**:
+   - Use an XMTP client that hasn't synced with the receiver's latest installation
+   - Send a message to the address from step 1
+
+3. **Observe the silent failure**:
+   With `XMTP_FORCE_DEBUG=true` (enabled by default in `run.sh`), you'll see:
+   ```json
+   {"timestamp":"...","level":"ERROR","message":"failed to create group from welcome created at ...: OpenMLS HPKE error: Decryption failed.","target":"xmtp_mls::groups::welcome_sync"}
+   {"timestamp":"...","level":"WARN","message":"[received] message error, swallowing to continue stream","inbox_id":"...","error":"Group(UnwrapWelcome(Hpke(DecryptionFailed)))","target":"bindings_node::conversations"}
+   ```
+
+### Key Findings
+
+1. **Error is Intentionally Swallowed**: The Node.js bindings catch the HPKE error and log "swallowing to continue stream" instead of propagating it to the application layer.
+
+2. **No Agent Error Event**: The error never reaches the `agent.on('error', ...)` handler, making it impossible for applications to detect and handle this failure.
+
+3. **Silent Failure Mode**: Messages fail to decrypt, but the agent continues running without surfacing the issue.
+
+### Debugging Tools Added
+
+This repository includes tools to help debug these issues:
+
+- **Heartbeat Logging**: When running in `--recv` mode, the script prints a heartbeat every 5 seconds to confirm the process is alive
+- **Verbose Error Logging**: Enhanced error handlers that print the full error object structure, including nested `cause` properties
+- **Debug Mode**: `XMTP_FORCE_DEBUG=true` is enabled by default to show internal SDK logs
+
+### Recommended Solutions
+
+1. **Short-term**: Enable `XMTP_FORCE_DEBUG` in production to capture these errors in logs
+2. **Medium-term**: File an issue upstream requesting that HPKE errors emit an 'error' event
+3. **Long-term**: The SDK should provide a way to handle or retry failed decryptions gracefully
+
+### Related Code
+
+- Error swallowing happens in: `bindings_node::conversations` (Rust → Node.js bindings)
+- Original error source: `xmtp_mls::groups::welcome_sync` (Rust core)
 
 ## 🏗️ Project Structure
 
