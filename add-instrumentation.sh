@@ -36,22 +36,22 @@ if ! command -v yarn >/dev/null 2>&1; then
   fi
 fi
 
-LIBXMTP_DIR=\"${ROOT_DIR}/libxmtp\"
+LIBXMTP_DIR="${ROOT_DIR}/libxmtp"
 
-if [ ! -d \"${LIBXMTP_DIR}\" ] || [ ! -d \"${LIBXMTP_DIR}/bindings_node\" ]; then
-  echo \"[add-instrumentation] libxmtp not found locally; fetching it...\" >&2
+if [ ! -d "${LIBXMTP_DIR}" ] || [ ! -d "${LIBXMTP_DIR}/bindings_node" ]; then
+  echo "[add-instrumentation] libxmtp not found locally; fetching it..." >&2
   if command -v git >/dev/null 2>&1; then
-    if [ -f \"${ROOT_DIR}/.gitmodules\" ] && git -C \"${ROOT_DIR}\" config -f .gitmodules --get-regexp '^submodule\\.libxmtp\\.' >/dev/null 2>&1; then
-      echo \"[add-instrumentation] Initializing libxmtp git submodule...\" >&2
-      git -C \"${ROOT_DIR}\" submodule update --init --recursive libxmtp
+    if [ -f "${ROOT_DIR}/.gitmodules" ] && git -C "${ROOT_DIR}" config -f .gitmodules --get-regexp '^submodule\.libxmtp\.' >/dev/null 2>&1; then
+      echo "[add-instrumentation] Initializing libxmtp git submodule..." >&2
+      git -C "${ROOT_DIR}" submodule update --init --recursive libxmtp
     fi
-    if [ ! -d \"${LIBXMTP_DIR}/bindings_node\" ]; then
-      echo \"[add-instrumentation] Cloning libxmtp repository into ./libxmtp...\" >&2
-      git -C \"${ROOT_DIR}\" clone https://github.com/xmtp/libxmtp.git libxmtp
+    if [ ! -d "${LIBXMTP_DIR}/bindings_node" ]; then
+      echo "[add-instrumentation] Cloning libxmtp repository into ./libxmtp..." >&2
+      git -C "${ROOT_DIR}" clone https://github.com/xmtp/libxmtp.git libxmtp
     fi
   else
-    echo \"error: libxmtp directory is missing and git is not installed, cannot fetch libxmtp\" >&2
-    echo \"hint: install git (e.g. 'sudo apt install -y git') and re-run this script\" >&2
+    echo "error: libxmtp directory is missing and git is not installed, cannot fetch libxmtp" >&2
+    echo "hint: install git (e.g. 'sudo apt install -y git') and re-run this script" >&2
     exit 1
   fi
 fi
