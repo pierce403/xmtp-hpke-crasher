@@ -107,7 +107,7 @@ elif [ -n "$1" ]; then
     RECEIVER_ADDRESS="$1"
 fi
 
-RECV_ONLY="$RECV_ONLY" RECEIVER_ADDRESS="$RECEIVER_ADDRESS" npx ts-node src/repro.ts 2>&1 | tee -a "$LOGFILE"
+RECV_ONLY="$RECV_ONLY" RECEIVER_ADDRESS="$RECEIVER_ADDRESS" XMTP_FORCE_DEBUG="true" npx ts-node src/repro.ts 2>&1 | tee -a "$LOGFILE"
 
 # Capture exit code
 EXIT_CODE=${PIPESTATUS[0]}

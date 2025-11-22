@@ -204,6 +204,10 @@ async function reproduce(): Promise<void> {
                 if ('code' in error) {
                     console.error('Error code:', (error as any).code);
                 }
+                if ('cause' in error) {
+                    console.error('Error cause:', (error as any).cause);
+                }
+                console.error('Full Error Object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
                 console.error('Stack trace:', error.stack);
             });
 
