@@ -113,6 +113,13 @@ if "use hex;" not in text:
         1,
     )
 
+# Ensure tracing::error import.
+if "use tracing::error;" not in text:
+    if "use tls_codec" in text:
+        text = text.replace("use tls_codec", "use tracing::error;\nuse tls_codec", 1)
+    else:
+        text = "use tracing::error;\n" + text
+
 def inject_start_block(src: str) -> str:
     marker = "    let ciphertext = HpkeCiphertext::tls_deserialize_exact(wrapped_welcome)?;"
     block = """    let wrapped_welcome_hex = hex::encode(wrapped_welcome);
