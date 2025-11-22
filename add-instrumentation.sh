@@ -14,12 +14,46 @@ if ! command -v cargo >/dev/null 2>&1; then
 fi
 
 if ! command -v yarn >/dev/null 2>&1; then
-  echo "error: yarn is not installed; cannot build local @xmtp/node-bindings" >&2
-  echo "hint: with npm installed, you can run:" >&2
-  echo "  npm install -g yarn" >&2
-  echo "or on Node 18+: enable corepack and use yarn:" >&2
-  echo "  corepack enable && corepack prepare yarn@stable --activate" >&2
-  exit 1
+  echo "[add-instrumentation] yarn not found; attempting to install globally via npm..." >&2
+  if command -v npm >/dev/null 2>&1; then
+    if npm install -g yarn; then
+      echo "[add-instrumentation] yarn installed successfully." >&2
+    else
+      echo "error: failed to install yarn with 'npm install -g yarn'" >&2
+      echo "hint: you may need to re-run with sudo, e.g.:" >&2
+      echo "  sudo npm install -g yarn" >&2
+      echo "or on Node 18+: enable corepack and use yarn:" >&2
+      echo "  corepack enable && corepack prepare yarn@stable --activate" >&2
+      exit 1
+    fi
+  else
+    echo "error: yarn is not installed and npm is not available to install it" >&2
+    echo "hint: install Node.js and npm first, then either:" >&2
+    echo "  npm install -g yarn" >&2
+    echo "or on Node 18+: enable corepack and use yarn:" >&2
+    echo "  corepack enable && corepack prepare yarn@stable --activate" >&2
+    exit 1
+  fi
+fi
+
+LIBXMTP_DIR=\"${ROOT_DIR}/libxmtp\"
+
+if [ ! -d \"${LIBXMTP_DIR}\" ] || [ ! -d \"${LIBXMTP_DIR}/bindings_node\" ]; then
+  echo \"[add-instrumentation] libxmtp not found locally; fetching it...\" >&2
+  if command -v git >/dev/null 2>&1; then
+    if [ -f \"${ROOT_DIR}/.gitmodules\" ] && git -C \"${ROOT_DIR}\" config -f .gitmodules --get-regexp '^submodule\\.libxmtp\\.' >/dev/null 2>&1; then
+      echo \"[add-instrumentation] Initializing libxmtp git submodule...\" >&2
+      git -C \"${ROOT_DIR}\" submodule update --init --recursive libxmtp
+    fi
+    if [ ! -d \"${LIBXMTP_DIR}/bindings_node\" ]; then
+      echo \"[add-instrumentation] Cloning libxmtp repository into ./libxmtp...\" >&2
+      git -C \"${ROOT_DIR}\" clone https://github.com/xmtp/libxmtp.git libxmtp
+    fi
+  else
+    echo \"error: libxmtp directory is missing and git is not installed, cannot fetch libxmtp\" >&2
+    echo \"hint: install git (e.g. 'sudo apt install -y git') and re-run this script\" >&2
+    exit 1
+  fi
 fi
 
 echo "[add-instrumentation] Building @xmtp/node-bindings from vendored libxmtp..."

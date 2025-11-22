@@ -75,12 +75,12 @@ See **`TODO.md`** for detailed next steps. Priority items:
 ## For Future Agents
 
 When working on this repo:
+- **Always git commit and push after each change** so the repro state stays in sync across machines, unless the user explicitly tells you not to.
 - **Don't remove** the debug logging tools (heartbeat, verbose errors)
 - **Keep** `XMTP_FORCE_DEBUG=true` enabled in run.sh
 - **Update** TODO.md as you make progress
 - **Document** any new findings in README.md
 - The goal is to **make HPKE errors visible**, not to fix them ourselves
-- When explicitly requested by the user, **commit and push** your changes so the repro state stays in sync across machines
 
 ## Dependencies
 
