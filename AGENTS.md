@@ -80,6 +80,7 @@ When working on this repo:
 - **Update** TODO.md as you make progress
 - **Document** any new findings in README.md
 - The goal is to **make HPKE errors visible**, not to fix them ourselves
+- When explicitly requested by the user, **commit and push** your changes so the repro state stays in sync across machines
 
 ## Dependencies
 

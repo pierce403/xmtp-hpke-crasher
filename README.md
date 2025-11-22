@@ -119,6 +119,29 @@ npm run clean
 ./run.sh 0x1234...
 ```
 
+## 🔬 Optional: deeper HPKE instrumentation (Rust)
+
+By default this repo uses the published XMTP SDKs from npm, which already reproduce the HPKE error on a clean system (no Rust toolchain required).
+
+If you also want low‑level HPKE logs from the underlying Rust `libxmtp` implementation, you can opt into a local build of `@xmtp/node-bindings`:
+
+1. Ensure you have Rust (`cargo`) and `yarn` installed.
+2. From the repo root, run:
+
+   ```bash
+   ./scripts/use-local-node-bindings.sh
+   ```
+
+   This builds `@xmtp/node-bindings` from the vendored `libxmtp/` workspace and symlinks it into `node_modules/@xmtp/node-bindings` so your existing `./run.sh` flows use the instrumented Rust code.
+
+3. Run the usual receiver repro:
+
+   ```bash
+   ./run.sh --recv
+   ```
+
+With this enabled, HPKE failures during welcome decryption will emit extra structured logs from `xmtp_mls::groups::mls_ext::welcome_wrapper`, in addition to the existing Node‑level error that is currently being swallowed.
+
 ## 🔍 HPKE Error Findings
 
 ### Issue Summary
