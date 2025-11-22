@@ -1,16 +1,14 @@
 /**
- * XMTP HPKE Error Reproduction Script
+ * XMTP Agent Simple Message Test
  * 
- * This script reproduces the OpenMLS HPKE decryption error (AgentError 1002)
- * by creating multiple stale installations for a single wallet address.
+ * This script is a minimal test to verify basic agent-to-agent communication.
  * 
  * Process:
  * 1. Create receiver and sender wallets
- * 2. Initialize receiver agent 3 times, deleting the DB each time to create stale installations
- * 3. Initialize receiver agent a 4th time and keep it running
- * 4. Initialize sender agent
- * 5. Send multiple messages from sender to receiver
- * 6. Monitor for HPKE decryption errors
+ * 2. Initialize receiver agent and start listening for messages
+ * 3. Initialize sender agent
+ * 4. Sender creates a conversation with receiver and sends a "poke" message
+ * 5. Wait for receiver to receive the message (or timeout after 30 seconds)
  */
 
 import { Agent } from '@xmtp/agent-sdk';
@@ -51,7 +49,7 @@ function deleteAgentDatabase(dbPath: string): void {
 /**
  * Create an XMTP-compatible signer from an ethers Wallet
  */
-function createSignerFromWallet(wallet: Wallet): any {
+function createSignerFromWallet(wallet: any): any {
     return {
         type: 'EOA',
         getIdentifier: () => ({
@@ -98,14 +96,26 @@ async function initializeAgent(
         console.error('Stack trace:', error.stack);
     });
 
-    // Start the agent
-    console.log(`   ... calling agent.start() for ${label}`);
-    await agent.start();
-    console.log(`   ✅ ${label} started`);
+    // Set up start handler to know when agent is ready
+    const startPromise = new Promise<void>((resolve) => {
+        agent.on('start', () => {
+            console.log(`   ✅ ${label} is online`);
+            
+            // Get installation ID from the client
+            const installationId = agent.client.installationId;
+            console.log(`   🔑 Installation ID: ${installationId}`);
+            
+            resolve();
+        });
+    });
 
-    // Get installation ID from the client
-    const installationId = agent.client.installationId;
-    console.log(`   🔑 Installation ID: ${installationId}`);
+    // Start the agent (don't await - it runs in background event loop)
+    console.log(`   ... calling agent.start() for ${label}`);
+    agent.start(); // Note: NOT awaiting!
+    
+    // Wait for the "start" event to confirm agent is ready
+    console.log(`   ... waiting for ${label} to come online...`);
+    await startPromise;
 
     return agent;
 }
@@ -113,11 +123,11 @@ async function initializeAgent(
 
 
 /**
- * Main reproduction function
+ * Main test function
  */
 async function reproduce(): Promise<void> {
     console.log('╔═══════════════════════════════════════════════════════╗');
-    console.log('║  XMTP HPKE Error Reproduction Script                 ║');
+    console.log('║  XMTP Agent Simple Message Test                      ║');
     console.log('╚═══════════════════════════════════════════════════════╝');
     console.log(`Environment: ${XMTP_ENV}`);
     console.log(`Debug: ${DEBUG}`);
@@ -144,27 +154,68 @@ async function reproduce(): Promise<void> {
         console.log('PHASE 1: Receiver Initialization');
         console.log('═══════════════════════════════════════════════════════');
 
-        const receiverAgent = await initializeAgent(receiverWallet, receiverDbPath, 'Receiver');
-
-        // Listen for messages on the receiver
-        console.log('   👂 Receiver listening for messages...');
-
         // Create a promise that resolves when the poke message is received
+        let resolvePokeReceived: () => void;
         const pokeReceived = new Promise<void>((resolve) => {
-            receiverAgent.on('message', async (message: any) => {
-                try {
-                    const text = message.content.text || message.content;
-                    console.log(`   📩 Receiver got message: "${text}"`);
+            resolvePokeReceived = resolve;
+        });
 
-                    if (text === 'poke') {
-                        console.log('\n✅ SUCCESS: Received "poke" message! Test passed.');
-                        resolve();
-                    }
-                } catch (err) {
-                    console.error('   ❌ Error processing message:', err);
+        // Create the receiver agent (but don't start it yet)
+        console.log(`\n🚀 Initializing Receiver...`);
+        console.log(`   Wallet Address: ${receiverWallet.address}`);
+        console.log(`   DB Path: ${receiverDbPath}`);
+
+        const receiverSigner = createSignerFromWallet(receiverWallet);
+        const receiverAgent = await Agent.create(receiverSigner, {
+            env: XMTP_ENV,
+            dbPath: receiverDbPath,
+        });
+
+        // Set up error handler
+        receiverAgent.on('error', (error: Error) => {
+            console.error(`\n❌ ERROR in Receiver:`, error);
+            console.error('Error name:', error.name);
+            console.error('Error message:', error.message);
+            if ('code' in error) {
+                console.error('Error code:', (error as any).code);
+            }
+            console.error('Stack trace:', error.stack);
+        });
+
+        // Set up message listener BEFORE starting
+        console.log('   👂 Setting up message listener...');
+        receiverAgent.on('message', async (ctx: any) => {
+            try {
+                // ctx is an AgentContext, ctx.message is the actual message
+                const content = ctx.message.content;
+                console.log(`   📩 Receiver got message:`, content);
+
+                if (content === 'poke') {
+                    console.log('\n✅ SUCCESS: Received "poke" message! Test passed.');
+                    resolvePokeReceived();
                 }
+            } catch (err) {
+                console.error('   ❌ Error processing message:', err);
+            }
+        });
+
+        // Set up start handler
+        const receiverStarted = new Promise<void>((resolve) => {
+            receiverAgent.on('start', () => {
+                console.log(`   ✅ Receiver is online`);
+                const installationId = receiverAgent.client.installationId;
+                console.log(`   🔑 Installation ID: ${installationId}`);
+                resolve();
             });
         });
+
+        // Start the agent (don't await - it runs in the background event loop)
+        console.log(`   ... calling agent.start() for Receiver`);
+        receiverAgent.start(); // Note: NOT awaiting!
+        
+        // Wait for the "start" event to confirm agent is ready
+        console.log(`   ... waiting for Receiver to come online...`);
+        await receiverStarted;
 
         // PHASE 2: Initialize Sender and send message
         console.log('\n═══════════════════════════════════════════════════════');
@@ -173,9 +224,13 @@ async function reproduce(): Promise<void> {
 
         const senderAgent = await initializeAgent(senderWallet, senderDbPath, 'Sender');
 
-        // Create conversation
-        console.log(`   🤝 Creating conversation with ${receiverWallet.address}...`);
-        const conversation = await senderAgent.conversations.newConversation(receiverWallet.address);
+        // Create conversation using DM (Direct Message) API
+        console.log(`   🤝 Creating DM conversation with ${receiverWallet.address}...`);
+        const identifier = {
+            identifier: receiverWallet.address.toLowerCase(),
+            identifierKind: 0,  // IdentifierKind.Ethereum = 0
+        };
+        const conversation = await senderAgent.client.conversations.newDmWithIdentifier(identifier);
 
         console.log('   📤 Sending "poke" message...');
         await conversation.send('poke');

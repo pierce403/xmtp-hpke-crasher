@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# XMTP HPKE Error Reproduction Script Runner
-# This script installs dependencies and runs the reproduction
+# XMTP Agent Simple Message Test Runner
+# This script installs dependencies and runs the test
 
 set -e  # Exit on error
 
@@ -19,7 +19,7 @@ log() {
 
 # Start logging
 log "╔═══════════════════════════════════════════════════════╗"
-log "║  XMTP HPKE Error Reproduction - Setup & Run          ║"
+log "║  XMTP Agent Simple Message Test - Setup & Run        ║"
 log "╚═══════════════════════════════════════════════════════╝"
 log ""
 log "🕐 Started at: $(date '+%Y-%m-%d %H:%M:%S %Z')"
@@ -94,8 +94,8 @@ if [ -f package.json ]; then
 fi
 log ""
 
-# Run the reproduction script using ts-node (handles ESM/CommonJS issues)
-log "🚀 Running reproduction script with ts-node..."
+# Run the test script using ts-node (handles ESM/CommonJS issues)
+log "🚀 Running test script with ts-node..."
 log ""
 npx ts-node src/repro.ts 2>&1 | tee -a "$LOGFILE"
 
