@@ -90,20 +90,13 @@ apply_hpke_instrumentation_patch() {
     return
   fi
 
-  if grep -q "HPKE unwrap_welcome starting (instrumented v2)" "${file}"; then
-    echo "[add-instrumentation] HPKE instrumentation already applied" >&2
-    return
-  fi
-
   echo "[add-instrumentation] Patching HPKE instrumentation into welcome_wrapper.rs..." >&2
   "${PYTHON}" - "${file}" <<'PY'
 import sys
 path = sys.argv[1]
 text = open(path, "r").read()
 
-# If already instrumented, bail.
-if "HPKE unwrap_welcome starting (instrumented v2)" in text:
-    sys.exit(0)
+# Idempotent: we still run to ensure imports are present even if marker exists.
 
 # Ensure hex import.
 if "use hex;" not in text:
