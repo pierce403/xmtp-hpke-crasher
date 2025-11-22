@@ -7,11 +7,18 @@ echo "[add-instrumentation] Enabling local libxmtp instrumentation..."
 
 if ! command -v cargo >/dev/null 2>&1; then
   echo "error: cargo (Rust) is not installed; cannot build local @xmtp/node-bindings" >&2
+  echo "hint: on Debian/Ubuntu you can run:" >&2
+  echo "  sudo apt update && sudo apt install -y cargo rustc build-essential pkg-config libssl-dev" >&2
+  echo "or install via rustup (recommended): https://rustup.rs" >&2
   exit 1
 fi
 
 if ! command -v yarn >/dev/null 2>&1; then
   echo "error: yarn is not installed; cannot build local @xmtp/node-bindings" >&2
+  echo "hint: with npm installed, you can run:" >&2
+  echo "  npm install -g yarn" >&2
+  echo "or on Node 18+: enable corepack and use yarn:" >&2
+  echo "  corepack enable && corepack prepare yarn@stable --activate" >&2
   exit 1
 fi
 
@@ -58,4 +65,3 @@ fi
 
 echo "[add-instrumentation] Done. Now run, for example:"
 echo "  ./run.sh --recv"
-
