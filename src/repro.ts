@@ -254,6 +254,12 @@ async function reproduce(): Promise<void> {
                 console.log(`   Listening for messages on: ${receiverAddress}`);
                 console.log('   Press Ctrl+C to exit...');
 
+                // Heartbeat to confirm liveness
+                setInterval(() => {
+                    const mem = process.memoryUsage();
+                    console.log(`   💓 [${new Date().toISOString()}] Waiting for messages... (RSS: ${Math.round(mem.rss / 1024 / 1024)}MB)`);
+                }, 5000);
+
                 // Keep the process alive indefinitely
                 await new Promise(() => { });
                 return;
