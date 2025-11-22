@@ -5,13 +5,68 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "[add-instrumentation] Enabling local libxmtp instrumentation..."
 
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "error: cargo (Rust) is not installed; cannot build local @xmtp/node-bindings" >&2
-  echo "hint: on Debian/Ubuntu you can run:" >&2
-  echo "  sudo apt update && sudo apt install -y cargo rustc build-essential pkg-config libssl-dev" >&2
-  echo "or install via rustup (recommended): https://rustup.rs" >&2
-  exit 1
-fi
+ensure_modern_rust() {
+  # Require a cargo new enough to support edition 2024 (Rust 1.81+).
+  local required="1.81.0"
+
+  if command -v cargo >/dev/null 2>&1; then
+    local version
+    version="$(cargo --version 2>/dev/null | awk '{print $2}')"
+    if [ -n "${version}" ]; then
+      # If version >= required, we're good.
+      if printf '%s\n%s\n' "$required" "$version" | sort -V | head -n1 | grep -qx "$required"; then
+        return 0
+      fi
+    fi
+  fi
+
+  echo "[add-instrumentation] Installing/updating Rust toolchain via rustup..." >&2
+
+  if ! command -v rustup >/dev/null 2>&1; then
+    if command -v curl >/dev/null 2>&1; then
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y || {
+        echo "error: failed to install rustup via curl" >&2
+        echo "hint: see https://rustup.rs for manual installation instructions" >&2
+        exit 1
+      }
+    elif command -v wget >/dev/null 2>&1; then
+      wget -qO- https://sh.rustup.rs | sh -s -- -y || {
+        echo "error: failed to install rustup via wget" >&2
+        echo "hint: see https://rustup.rs for manual installation instructions" >&2
+        exit 1
+      }
+    else
+      echo "error: cargo is too old and neither curl nor wget is available to install rustup" >&2
+      echo "hint: install curl or wget, then re-run this script, or install Rust manually from https://rustup.rs" >&2
+      exit 1
+    fi
+  fi
+
+  if [ -f "${HOME}/.cargo/env" ]; then
+    # shellcheck disable=SC1090
+    . "${HOME}/.cargo/env"
+  fi
+  export PATH="${HOME}/.cargo/bin:${PATH}"
+
+  rustup install stable >/dev/null 2>&1 || rustup update stable >/dev/null 2>&1 || true
+
+  if ! command -v cargo >/dev/null 2>&1; then
+    echo "error: cargo is still not available after rustup installation" >&2
+    exit 1
+  fi
+
+  local new_version
+  new_version="$(cargo --version 2>/dev/null | awk '{print $2}')"
+  if [ -n "${new_version}" ]; then
+    if ! printf '%s\n%s\n' "$required" "$new_version" | sort -V | head -n1 | grep -qx "$required"; then
+      echo "error: cargo ${new_version} is still too old; need at least ${required} for edition 2024" >&2
+      echo "hint: run 'rustup update stable' manually and re-run this script" >&2
+      exit 1
+    fi
+  fi
+}
+
+ensure_modern_rust
 
 if ! command -v yarn >/dev/null 2>&1; then
   echo "[add-instrumentation] yarn not found; attempting to install globally via npm..." >&2
