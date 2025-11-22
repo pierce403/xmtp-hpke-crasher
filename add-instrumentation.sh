@@ -127,6 +127,15 @@ cat > dist/version.json <<'EOF'
   "date": "1970-01-01T00:00:00Z"
 }
 EOF
+
+echo "[add-instrumentation] Ensuring package.json exports ./version.json..."
+PKG_JSON="${PWD}/package.json"
+if [ -f "${PKG_JSON}" ]; then
+  if ! grep -q '"./version.json"' "${PKG_JSON}"; then
+    perl -0pi -e 's/"exports":\s*\{\s*"\.":\s*\{\s*"types":\s*"\.\/dist\/index\.d\.ts",\s*"default":\s*"\.\/dist\/index\.js"\s*\}\s*\}/"exports": {\n    \".\": {\n      \"types\": \"\.\/dist\/index\.d\.ts\",\n      \"default\": \"\.\/dist\/index\.js\"\n    },\n    \"\.\/version.json\": \"\.\/dist\/version.json\"\n  }/s' "${PKG_JSON}" || true
+  fi
+fi
+
 popd >/dev/null
 
 echo "[add-instrumentation] Wiring Node to use local @xmtp/node-bindings..."
