@@ -134,8 +134,14 @@ async function reproduce(): Promise<void> {
 
     // Generate random wallets
     console.log('\n🔐 Generating wallets...');
-    const senderWallet = Wallet.createRandom();
-    console.log(`   Sender: ${senderWallet.address}`);
+
+    const recvOnly = process.env.RECV_ONLY === 'true';
+
+    // If recvOnly, we don't need a sender wallet
+    const senderWallet = recvOnly ? null : Wallet.createRandom();
+    if (senderWallet) {
+        console.log(`   Sender: ${senderWallet.address}`);
+    }
 
     // Check if a receiver address was provided via environment variable
     const externalReceiverAddress = process.env.RECEIVER_ADDRESS;
@@ -159,7 +165,9 @@ async function reproduce(): Promise<void> {
     if (!externalReceiverAddress) {
         deleteAgentDatabase(receiverDbPath);
     }
-    deleteAgentDatabase(senderDbPath);
+    if (!recvOnly) {
+        deleteAgentDatabase(senderDbPath);
+    }
 
     let receiverAgent: any;
     let senderAgent: any;
@@ -207,6 +215,11 @@ async function reproduce(): Promise<void> {
                     const content = ctx.message.content;
                     console.log(`   📩 Receiver got message:`, content);
 
+                    if (recvOnly) {
+                        // In recvOnly mode, we just print and keep listening
+                        return;
+                    }
+
                     if (content === 'poke') {
                         console.log('\n✅ SUCCESS: Received "poke" message! Test passed.');
                         resolvePokeReceived();
@@ -233,6 +246,18 @@ async function reproduce(): Promise<void> {
             // Wait for the "start" event to confirm agent is ready
             console.log(`   ... waiting for Receiver to come online...`);
             await receiverStarted;
+
+            if (recvOnly) {
+                console.log('\n═══════════════════════════════════════════════════════');
+                console.log('LISTENING MODE ENABLED');
+                console.log('═══════════════════════════════════════════════════════');
+                console.log(`   Listening for messages on: ${receiverAddress}`);
+                console.log('   Press Ctrl+C to exit...');
+
+                // Keep the process alive indefinitely
+                await new Promise(() => { });
+                return;
+            }
         } else {
             console.log('\n═══════════════════════════════════════════════════════');
             console.log('PHASE 1: Receiver Initialization (SKIPPED)');
@@ -245,6 +270,7 @@ async function reproduce(): Promise<void> {
         console.log('PHASE 2: Sender Initialization & Messaging');
         console.log('═══════════════════════════════════════════════════════');
 
+        if (!senderWallet) throw new Error("Sender wallet not initialized");
         senderAgent = await initializeAgent(senderWallet, senderDbPath, 'Sender');
 
         // Create conversation using DM (Direct Message) API

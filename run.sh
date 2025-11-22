@@ -97,7 +97,17 @@ log ""
 # Run the test script using ts-node (handles ESM/CommonJS issues)
 log "🚀 Running test script with ts-node..."
 log ""
-RECEIVER_ADDRESS="$1" npx ts-node src/repro.ts 2>&1 | tee -a "$LOGFILE"
+# Parse arguments
+RECV_ONLY="false"
+RECEIVER_ADDRESS=""
+
+if [ "$1" == "--recv" ]; then
+    RECV_ONLY="true"
+elif [ -n "$1" ]; then
+    RECEIVER_ADDRESS="$1"
+fi
+
+RECV_ONLY="$RECV_ONLY" RECEIVER_ADDRESS="$RECEIVER_ADDRESS" npx ts-node src/repro.ts 2>&1 | tee -a "$LOGFILE"
 
 # Capture exit code
 EXIT_CODE=${PIPESTATUS[0]}
