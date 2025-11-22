@@ -101,9 +101,11 @@ import sys
 path = sys.argv[1]
 text = open(path, "r").read()
 
+# If already instrumented, bail.
 if "HPKE unwrap_welcome starting (instrumented v2)" in text:
     sys.exit(0)
 
+# Ensure hex import.
 if "use hex;" not in text:
     text = text.replace(
         "use thiserror::Error;\nuse tls_codec",
@@ -111,15 +113,9 @@ if "use hex;" not in text:
         1,
     )
 
-text = text.replace(
-"""    error!(
-        wrapped_welcome_len = wrapped_welcome.len(),
-        wrapped_welcome_metadata_len = wrapped_welcome_metadata.len(),
-        private_key_len = private_key.len(),
-        wrapper_algorithm = ?wrapper_algorithm,
-        "HPKE unwrap_welcome starting"
-    );""",
-"""    let wrapped_welcome_hex = hex::encode(wrapped_welcome);
+def inject_start_block(src: str) -> str:
+    marker = "    let ciphertext = HpkeCiphertext::tls_deserialize_exact(wrapped_welcome)?;"
+    block = """    let wrapped_welcome_hex = hex::encode(wrapped_welcome);
     let wrapped_welcome_metadata_hex = hex::encode(wrapped_welcome_metadata);
     let private_key_prefix_hex = hex::encode(&private_key[..private_key.len().min(16)]);
     error!(
@@ -131,10 +127,21 @@ text = text.replace(
         private_key_prefix_hex = %private_key_prefix_hex,
         wrapper_algorithm = ?wrapper_algorithm,
         "HPKE unwrap_welcome starting (instrumented v2)"
-    );""",
-)
+    );
+"""
+    if marker in src:
+        return src.replace(marker, block + marker, 1)
+    return src
 
-text = text.replace(
+text = inject_start_block(text)
+
+def replace_once(src: str, old: str, new: str) -> str:
+    if old in src:
+        return src.replace(old, new, 1)
+    return src
+
+text = replace_once(
+    text,
 """            error!(
                 ?e,
                 kem_output_len = ciphertext.kem_output.as_ref().len(),
@@ -152,10 +159,11 @@ text = text.replace(
                 ciphertext_hex = %hex::encode(ciphertext.ciphertext.as_ref()),
                 wrapper_algorithm = ?wrapper_algorithm,
                 "HPKE unwrap_welcome setup_receiver failed"
-            );""",
+            );"""
 )
 
-text = text.replace(
+text = replace_once(
+    text,
 """            error!(
                 ?e,
                 kem_output_len = ciphertext.kem_output.as_ref().len(),
@@ -173,10 +181,11 @@ text = text.replace(
                 ciphertext_hex = %hex::encode(ciphertext.ciphertext.as_ref()),
                 wrapper_algorithm = ?wrapper_algorithm,
                 "HPKE unwrap_welcome failed to open welcome"
-            );""",
+            );"""
 )
 
-text = text.replace(
+text = replace_once(
+    text,
 """                error!(
                     ?e,
                     kem_output_len = ciphertext.kem_output.as_ref().len(),
@@ -194,7 +203,7 @@ text = text.replace(
                     metadata_hex = %hex::encode(wrapped_welcome_metadata),
                     wrapper_algorithm = ?wrapper_algorithm,
                     "HPKE unwrap_welcome failed to open welcome_metadata"
-                );""",
+                );"""
 )
 
 open(path, "w").write(text)
