@@ -27,3 +27,14 @@ Receiver running with instrumentation and a sender with stale keys. HPKE unwrap 
 💓 [2025-11-22T13:26:16.416Z] Waiting for messages... (RSS: 317MB)
 💓 [2025-11-22T13:26:21.420Z] Waiting for messages... (RSS: 317MB)
 ```
+
+Another sad-path run (still no HPKE unwrap instrumentation visible in logs):
+
+```text
+💓 [2025-11-22T13:54:58.754Z] Waiting for messages... (RSS: 340MB)
+💓 [2025-11-22T13:55:03.760Z] Waiting for messages... (RSS: 340MB)
+{"timestamp":"2025-11-22T13:55:03.813251Z","level":"ERROR","message":"failed to create group from welcome=[sid(110838630):oid(11)] created at 1763819703: OpenMLS HPKE error: Decryption failed.","target":"xmtp_mls::groups::welcome_sync"}
+{"timestamp":"2025-11-22T13:55:03.813294Z","level":"WARN","message":"[received] message error, swallowing to continue stream","inbox_id":"bd19598b2fe45d2a0f1b4d0992809ac9b3f4a622b307e94ed4fad253f544cb9d","error":"Group(UnwrapWelcome(Hpke(DecryptionFailed)))","target":"bindings_node::conversations"}
+💓 [2025-11-22T13:55:08.765Z] Waiting for messages... (RSS: 338MB)
+💓 [2025-11-22T13:55:13.771Z] Waiting for messages... (RSS: 338MB)
+```
