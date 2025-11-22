@@ -66,7 +66,23 @@ ensure_modern_rust() {
   fi
 }
 
+ensure_python() {
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON=python3
+    return
+  fi
+  if command -v python >/dev/null 2>&1; then
+    PYTHON=python
+    return
+  fi
+  echo "error: python3 is not installed; cannot apply HPKE instrumentation patch" >&2
+  echo "hint: on Ubuntu/Debian you can run:" >&2
+  echo "  sudo apt update && sudo apt install -y python3" >&2
+  exit 1
+}
+
 ensure_modern_rust
+ensure_python
 apply_hpke_instrumentation_patch() {
   local file="${LIBXMTP_DIR}/xmtp_mls/src/groups/mls_ext/welcome_wrapper.rs"
   if [ ! -f "${file}" ]; then
@@ -80,7 +96,7 @@ apply_hpke_instrumentation_patch() {
   fi
 
   echo "[add-instrumentation] Patching HPKE instrumentation into welcome_wrapper.rs..." >&2
-  python - "${file}" <<'PY'
+  "${PYTHON}" - "${file}" <<'PY'
 import sys
 path = sys.argv[1]
 text = open(path, "r").read()
