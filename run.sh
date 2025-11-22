@@ -97,7 +97,7 @@ log ""
 # Run the test script using ts-node (handles ESM/CommonJS issues)
 log "🚀 Running test script with ts-node..."
 log ""
-npx ts-node src/repro.ts 2>&1 | tee -a "$LOGFILE"
+RECEIVER_ADDRESS="$1" npx ts-node src/repro.ts 2>&1 | tee -a "$LOGFILE"
 
 # Capture exit code
 EXIT_CODE=${PIPESTATUS[0]}
